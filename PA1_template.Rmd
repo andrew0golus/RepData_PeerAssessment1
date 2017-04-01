@@ -1,25 +1,96 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research - Course Project 1"
+author: "Andrew Golus"
+date: "March 30, 2017"
+output:
+  html_document: default
+  pdf_document: default
 ---
 
+### Load the dataset
+```{r load}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/ag827/Desktop/R")
+activity <- read.csv("activity.csv")
+```
 
-## Loading and preprocessing the data
+### Create histogram of the total number of steps taken each day
+```{r histogram1}
+library(dplyr)
+steps.by.day <- activity %>%
+        filter(is.na(steps)==FALSE) %>%
+        group_by(date) %>%
+        summarize(mean.steps = sum(steps))
+hist(steps.by.day$mean.steps, main = "Histogram", xlab = "Average Number of Steps per Day")
+```
 
+### Calculate mean number of steps taken each day
+```{r mean1}
+mean(steps.by.day$mean.steps)
+```
 
+### Calculate median number of steps taken each day
+```{r median1}
+quantile(steps.by.day$mean.steps, probs = 0.5)
+```
 
-## What is mean total number of steps taken per day?
+### Create time series plot of the average number of steps taken
+```{r time.series}
+steps.by.interval <- activity %>%
+        filter(is.na(steps)==FALSE) %>%
+        group_by(interval) %>%
+        summarize(mean.steps = mean(steps))
+plot(steps.by.interval$interval, steps.by.interval$mean.steps, type = "l", xlab = "Interval", ylab = "Average Number of Steps", main = "Series Plot")
+```
 
+### Determine the 5-minute interval that, on average, contains the maximum number of steps
+```{r max.interval}
+subset(steps.by.interval, steps.by.interval$mean.steps == max(steps.by.interval$mean.steps))[1,1]
+```
 
+### Calculate the total number of missing values in the dataset
+```{r missing}
+sum(is.na(activity$steps) == TRUE)
+```
 
-## What is the average daily activity pattern?
+### Create a new dataset with imputed missing data
+My strategy is to replace the missing step values with the average number of steps for the interval.
+```{r impute}
+x0 <- subset(activity, is.na(activity$steps) == FALSE)
+x1 <- subset(activity, is.na(activity$steps) == TRUE)
+x1 <- merge(x1, steps.by.interval, all.x = TRUE)
+x1 <- x1[,-2]
+names(x1) <- c("interval", "date", "steps")
+activity.fix <- rbind.data.frame(x0, x1)
+steps.by.day <- activity.fix %>%
+        filter(is.na(steps)==FALSE) %>%
+        group_by(date) %>%
+        summarize(mean.steps = sum(steps))
+```
 
+### Create histogram of the total number of steps taken each day after missing values are imputed
+```{r histogram2}
+hist(steps.by.day$mean.steps, main = "Histogram", xlab = "Average Number of Steps per Day")
+```
 
+### Calculate mean number of steps taken each day after missing values are imputed
+```{r mean2}
+mean(steps.by.day$mean.steps)
+```
 
-## Imputing missing values
+### Calculate median number of steps taken each day after missing values are imputed
+```{r median2}
+quantile(steps.by.day$mean.steps, probs = 0.5)
+```
 
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+### Compare the average number of steps taken per 5-minute interval across weekdays and weekends
+```{r weekday}
+activity.weekday <- activity.fix %>%
+mutate(weekday = weekdays(as.Date(date))) %>%
+mutate(isweekend = ifelse(weekday == "Saturday" | weekday == "Sunday","weekend","weekday")) %>%
+group_by(interval, isweekend) %>%
+summarize(steps = mean(steps))
+library(ggplot2)
+g <- ggplot(activity.weekday, aes(interval, steps))
+g + geom_line() + facet_grid(isweekend ~ .)
+```
